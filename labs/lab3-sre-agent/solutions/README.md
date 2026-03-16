@@ -574,6 +574,27 @@ The orchestrator connects all three agents in a loop:
 
 ---
 
+## Cost & Security Notes
+
+### Cost
+
+The orchestrator in `--watch` mode makes repeated Azure OpenAI calls (one per detected issue per cycle). Cost estimates are approximate — **verify current pricing with your Azure administrator or the [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/)** before running extended sessions.
+
+- A 10-iteration run ≈ 10 LLM calls ≈ ~$0.05–0.10 (approximate, based on pay-as-you-go pricing)
+- The escalation logic (exits after 2 failed attempts per issue type) prevents unbounded API calls
+- Always Ctrl+C or let the escalation logic exit the loop when testing is done
+
+### Security
+
+> **Reminder:** These scripts are for learning and experimentation — not production use. Review with your security team before adapting.
+
+- **Entra ID auth** — No API keys in code or environment. The `AzureCliCredential` uses your active `az login` session.
+- **Rollback state** — Saved to `rollback/` before every mutation. Never patch without recording the previous state.
+- **Grace period** — Pod deletes use `--grace-period=5` to avoid hanging on terminating containers, but this skips graceful shutdown. In production, use the default grace period.
+- **Namespace scope** — All agents accept `--namespace` and never operate outside it. The orchestrator only monitors and remediates within the specified namespace.
+
+---
+
 ## Solution 7 — Cleanup
 
 ```powershell

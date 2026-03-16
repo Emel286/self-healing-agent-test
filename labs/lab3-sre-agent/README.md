@@ -261,6 +261,34 @@ Also clean up any local Python/agent files you no longer need.
 
 ---
 
+## Cost & Security Considerations
+
+### Cost awareness
+
+The agents in this lab make calls to Azure OpenAI, which is a billable service. The cost estimates below are for **awareness only** — actual costs vary by region, pricing tier, and token usage. Always confirm current pricing with your Azure administrator or the [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/).
+
+- Each diagnosis agent call uses ~2K–5K tokens with `gpt-4o-mini`. At current pricing, a single diagnosis costs fractions of a cent — but the orchestrator loop can make many calls in `--watch` mode.
+- **Tip:** Use `--dry-run` on the remediation agent to avoid unnecessary redeploys and re-diagnosis cycles during development.
+- **Stop the cluster** when you're done with labs: `az aks stop --resource-group rg-devai-hackathon --name devai-hackathon-aks`
+- Consult your organization's cloud team before running extended orchestrator sessions.
+
+### Security in the agent pipeline
+
+> **This lab is for learning purposes only.** The agent scripts and pipeline are designed to teach SRE automation patterns — they are not production-ready. Before adapting these patterns for real environments, review the security considerations below and consult your organization's security team.
+
+| Principle | How it's implemented |
+|-----------|---------------------|
+| **Least privilege** | The diagnosis agent only needs read access (pod describe, logs, events). The remediation agent needs write access — keep these separate in production. |
+| **No hardcoded secrets** | Entra ID auth uses your `az login` session — no API keys stored in code, env vars, or config files. |
+| **Human-in-the-loop** | The remediation agent requires explicit `y/n` approval before executing changes. High-risk actions are blocked by guardrails. |
+| **Blast radius controls** | Guardrails check affected pod count, namespace protection list, and risk level before allowing remediation. |
+| **Audit trail** | Every action is logged with timestamps. Rollback state is saved before any mutation. |
+| **Namespace isolation** | Agents target a specific namespace — they cannot accidentally modify `kube-system`, `monitoring`, or other namespaces. |
+
+> **Production note:** In a real deployment, SRE agents should run with a dedicated Kubernetes ServiceAccount that has RBAC scoped to specific namespaces and verbs. Never run remediation agents with cluster-admin privileges. Work with your platform and security teams to define appropriate access boundaries.
+
+---
+
 ## Summary
 
 | Concept | What You Should Have Learned |
