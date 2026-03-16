@@ -1,0 +1,34 @@
+# =============================================================================
+# Challenge 2 — ImagePullBackOff
+# This deployment references a non-existent image (typo in name).
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: imagepull-app
+  namespace: lab2
+  labels:
+    app: imagepull-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: imagepull-app
+  template:
+    metadata:
+      labels:
+        app: imagepull-app
+    spec:
+      containers:
+        - name: web
+          # BUG: Image name has a typo — "nginxxx" doesn't exist
+          image: nginxxx:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi

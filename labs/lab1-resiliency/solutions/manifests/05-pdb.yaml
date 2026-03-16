@@ -1,0 +1,79 @@
+# =============================================================================
+# Exercise 5 — Pod Disruption Budget (PDB)
+# Deploys the same self-healing app with a PDB that requires at least 2 pods
+# to remain available during voluntary disruptions (drain, upgrades).
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: self-healing
+  namespace: lab1
+  labels:
+    app: self-healing
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: self-healing
+  template:
+    metadata:
+      labels:
+        app: self-healing
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: self-healing
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 5
+            failureThreshold: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: self-healing-svc
+  namespace: lab1
+spec:
+  selector:
+    app: self-healing
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP
+---
+# Pod Disruption Budget — At least 2 out of 3 pods must be available
+# during voluntary disruptions like node drains or cluster upgrades.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: self-healing-pdb
+  namespace: lab1
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: self-healing

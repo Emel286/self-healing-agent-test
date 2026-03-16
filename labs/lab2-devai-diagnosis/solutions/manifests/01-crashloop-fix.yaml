@@ -1,0 +1,34 @@
+# =============================================================================
+# Solution 1 — CrashLoopBackOff Fix
+# Removed the invalid command so nginx uses its default entrypoint.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crashloop-app
+  namespace: lab2
+  labels:
+    app: crashloop-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crashloop-app
+  template:
+    metadata:
+      labels:
+        app: crashloop-app
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27-alpine
+          # FIX: Removed the invalid command — nginx uses its default entrypoint
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi

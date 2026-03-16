@@ -1,0 +1,66 @@
+# =============================================================================
+# Challenge 6 — Broken App (Multiple Issues)
+# This deployment has 3 bugs:
+#   1. Wrong containerPort (8080, but nginx listens on 80)
+#   2. Invalid readiness probe path (/healthcheck returns 404)
+#   3. Memory limit too low (4Mi causes OOM kill)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-app
+  namespace: lab2
+  labels:
+    app: broken-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: broken-app
+  template:
+    metadata:
+      labels:
+        app: broken-app
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27-alpine
+          ports:
+            # BUG 1: nginx listens on 80, not 8080
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 50m
+              memory: 4Mi
+            limits:
+              cpu: 100m
+              # BUG 3: 4Mi is far too low for nginx — will be OOM killed
+              memory: 4Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              # BUG 1 (continued): probe points to wrong port
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              # BUG 2: /healthcheck doesn't exist in nginx — returns 404
+              path: /healthcheck
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: broken-app-svc
+  namespace: lab2
+spec:
+  selector:
+    app: broken-app
+  ports:
+    - port: 80
+      # BUG 1 (continued): targeting wrong port
+      targetPort: 8080
+  type: ClusterIP

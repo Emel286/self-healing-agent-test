@@ -1,0 +1,129 @@
+# =============================================================================
+# Challenge 2 — Degrading Application
+# Deploys an app that starts healthy, then gradually degrades:
+#   - 0-60s:   Healthy (200 responses)
+#   - 60-120s: 30% error rate (500 responses)
+#   - 120s+:   Memory growth + readiness failure
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: degrading-app
+  namespace: lab3
+  labels:
+    app: degrading-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: degrading-app
+  template:
+    metadata:
+      labels:
+        app: degrading-app
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              # Intentionally low — will eventually OOM
+              memory: 64Mi
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Write a custom nginx config with a health endpoint
+              cat > /etc/nginx/conf.d/default.conf << 'CONF'
+              server {
+                  listen 80;
+                  location / {
+                      root /usr/share/nginx/html;
+                      index index.html;
+                  }
+                  location /healthz {
+                      return 200 "ok";
+                  }
+                  location /ready {
+                      root /usr/share/nginx/html;
+                      try_files /ready.txt =503;
+                  }
+              }
+              CONF
+
+              # Create readiness file
+              echo "ready" > /usr/share/nginx/html/ready.txt
+
+              # Start nginx
+              nginx -g 'daemon off;' &
+              NGINX_PID=$!
+
+              # Phase 1: Healthy (60 seconds)
+              sleep 60
+
+              # Phase 2: Start returning errors (update config to 500 on /error)
+              cat > /etc/nginx/conf.d/default.conf << 'CONF'
+              server {
+                  listen 80;
+                  location / {
+                      return 500 "internal server error";
+                  }
+                  location /healthz {
+                      return 200 "ok";
+                  }
+                  location /ready {
+                      root /usr/share/nginx/html;
+                      try_files /ready.txt =503;
+                  }
+              }
+              CONF
+              nginx -s reload
+              sleep 60
+
+              # Phase 3: Remove readiness + consume memory
+              rm -f /usr/share/nginx/html/ready.txt
+              nginx -s reload
+
+              # Allocate memory until OOM — writes to /dev/shm (tmpfs) which
+              # counts against the container's memory cgroup limit
+              while true; do
+                dd if=/dev/urandom bs=1M count=5 >> /dev/shm/memory_hog 2>/dev/null
+                sleep 2
+              done
+
+              wait $NGINX_PID
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: degrading-app-svc
+  namespace: lab3
+spec:
+  selector:
+    app: degrading-app
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP

@@ -1,0 +1,81 @@
+# =============================================================================
+# Exercise 1 — Healthy Application with Liveness, Readiness, and Startup Probes
+# This deploys an Nginx app with all three probe types properly configured.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healthy-app
+  namespace: lab1
+  labels:
+    app: healthy-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: healthy-app
+  template:
+    metadata:
+      labels:
+        app: healthy-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+
+          # --- Startup Probe ---
+          # Gives the container time to start before liveness checks begin.
+          # Kubernetes checks every 5s, up to 6 failures (30s total to start).
+          startupProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            failureThreshold: 6
+
+          # --- Liveness Probe ---
+          # Checks if the container is still alive. If this fails, the
+          # container is killed and restarted by kubelet.
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 3
+
+          # --- Readiness Probe ---
+          # Checks if the container is ready to accept traffic. If this fails,
+          # the pod is removed from Service endpoints (no traffic routed to it).
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            failureThreshold: 2
+            timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: healthy-app-svc
+  namespace: lab1
+spec:
+  selector:
+    app: healthy-app
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP

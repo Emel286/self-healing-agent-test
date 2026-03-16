@@ -1,0 +1,106 @@
+# =============================================================================
+# Solution 4 — AI-Generated App (reference solution)
+# A security-hardened Node.js deployment with all probes, PDB, and
+# topology spread constraints. This is what a well-crafted Copilot
+# interaction should produce after iterative refinement.
+# =============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nodejs-app-sa
+  namespace: lab2
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodejs-app
+  namespace: lab2
+  labels:
+    app: nodejs-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nodejs-app
+  template:
+    metadata:
+      labels:
+        app: nodejs-app
+    spec:
+      serviceAccountName: nodejs-app-sa
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: nodejs-app
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: nodejs
+          image: node:20-alpine
+          command: ["node", "-e", "require('http').createServer((req,res)=>{res.writeHead(200);res.end('ok')}).listen(3000)"]
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            periodSeconds: 5
+            failureThreshold: 2
+            timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodejs-app-svc
+  namespace: lab2
+spec:
+  selector:
+    app: nodejs-app
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: ClusterIP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nodejs-app-pdb
+  namespace: lab2
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: nodejs-app

@@ -1,0 +1,79 @@
+# =============================================================================
+# Exercise 2 — Liveness Probe Failure Simulation
+# This deploys a container that returns HTTP 200 for the first ~30 seconds,
+# then starts returning HTTP 500, causing the liveness probe to fail.
+# Kubernetes will automatically restart the container.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: liveness-fail
+  namespace: lab1
+  labels:
+    app: liveness-fail
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: liveness-fail
+  template:
+    metadata:
+      labels:
+        app: liveness-fail
+    spec:
+      containers:
+        - name: liveness-fail
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+
+          # On startup, create a healthy endpoint. After 30s, replace it
+          # with one that returns HTTP 500 to simulate an app crash.
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Start Nginx in the background
+              nginx -g 'daemon off;' &
+              NGINX_PID=$!
+
+              # Create a healthy endpoint
+              echo "OK" > /usr/share/nginx/html/healthz
+
+              # Wait 30 seconds, then make the health endpoint return an error
+              sleep 30
+
+              # Replace the default config to return 500 on /healthz
+              cat > /etc/nginx/conf.d/default.conf << 'EOF'
+              server {
+                  listen 80;
+                  location / {
+                      root /usr/share/nginx/html;
+                      index index.html;
+                  }
+                  location /healthz {
+                      return 500 "unhealthy";
+                  }
+              }
+              EOF
+              nginx -s reload
+
+              # Keep the container running
+              wait $NGINX_PID
+
+          # Liveness probe checks /healthz — will fail after ~30 seconds
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+            timeoutSeconds: 3

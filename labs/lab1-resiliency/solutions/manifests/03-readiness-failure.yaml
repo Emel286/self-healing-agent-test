@@ -1,0 +1,91 @@
+# =============================================================================
+# Exercise 3 — Readiness Probe Failure Simulation
+# This deploys a container where the readiness probe fails after ~20 seconds.
+# Unlike liveness failures, the pod is NOT restarted — it is removed from
+# the Service endpoints so no traffic is routed to it.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: readiness-fail
+  namespace: lab1
+  labels:
+    app: readiness-fail
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: readiness-fail
+  template:
+    metadata:
+      labels:
+        app: readiness-fail
+    spec:
+      containers:
+        - name: readiness-fail
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+
+          # On startup: create /ready endpoint. After 20s, remove it to
+          # simulate the app becoming unable to serve new requests.
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Start Nginx in the background
+              nginx -g 'daemon off;' &
+              NGINX_PID=$!
+
+              # Create a "ready" file that the readiness probe checks
+              echo "READY" > /usr/share/nginx/html/ready
+
+              # Wait 20 seconds, then remove the ready file
+              sleep 20
+              rm -f /usr/share/nginx/html/ready
+
+              # Keep the container running (pod stays Running, not restarted)
+              wait $NGINX_PID
+
+          # Readiness probe — checks if /ready returns 200
+          # When the file is removed, Nginx returns 404 → readiness fails
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 80
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            failureThreshold: 2
+            timeoutSeconds: 3
+
+          # Liveness probe — always succeeds (checks root /)
+          # This ensures the pod is NOT restarted, only marked as unready
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 2
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 3
+---
+# Service used to observe endpoint changes when readiness fails
+apiVersion: v1
+kind: Service
+metadata:
+  name: readiness-fail-svc
+  namespace: lab1
+spec:
+  selector:
+    app: readiness-fail
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP

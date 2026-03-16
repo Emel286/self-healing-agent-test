@@ -1,0 +1,35 @@
+# =============================================================================
+# Challenge 3 — Resource Constraint (Pending pod)
+# This deployment requests 64Gi of memory, which exceeds all node capacity
+# on Standard_D2s_v3 nodes (8 GiB each). Pods will be stuck in Pending.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: resource-hog
+  namespace: lab2
+  labels:
+    app: resource-hog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: resource-hog
+  template:
+    metadata:
+      labels:
+        app: resource-hog
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 100m
+              # BUG: 64Gi far exceeds available node memory (8Gi per node)
+              memory: 64Gi
+            limits:
+              cpu: 200m
+              memory: 64Gi

@@ -1,0 +1,66 @@
+# =============================================================================
+# Solution 6 — Broken App Fix
+# Fixed all 3 issues:
+#   1. containerPort, probe ports, Service targetPort → 80
+#   2. readinessProbe path → / (valid nginx endpoint)
+#   3. memory request/limit → 64Mi/128Mi (appropriate for nginx)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-app
+  namespace: lab2
+  labels:
+    app: broken-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: broken-app
+  template:
+    metadata:
+      labels:
+        app: broken-app
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27-alpine
+          ports:
+            # FIX 1: Corrected to port 80 (nginx default)
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              # FIX 3: Increased to reasonable values
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              # FIX 1: Corrected port
+              port: 80
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              # FIX 2: Changed to / which returns 200 on nginx
+              path: /
+              port: 80
+            periodSeconds: 5
+            failureThreshold: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: broken-app-svc
+  namespace: lab2
+spec:
+  selector:
+    app: broken-app
+  ports:
+    - port: 80
+      # FIX 1: Corrected targetPort
+      targetPort: 80
+  type: ClusterIP

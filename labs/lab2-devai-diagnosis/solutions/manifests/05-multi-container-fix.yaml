@@ -1,0 +1,79 @@
+# =============================================================================
+# Solution 5 — Multi-Container Pod Fix
+# Added a ConfigMap with the expected config.yaml and mounted it as the
+# shared volume instead of an emptyDir.
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: lab2
+data:
+  config.yaml: |
+    app:
+      name: multi-container-app
+      logLevel: info
+      metricsEnabled: true
+      port: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multi-container-app
+  namespace: lab2
+  labels:
+    app: multi-container-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multi-container-app
+  template:
+    metadata:
+      labels:
+        app: multi-container-app
+    spec:
+      volumes:
+        # FIX: Use a ConfigMap to provide the expected config file
+        - name: shared-data
+          configMap:
+            name: app-config
+      containers:
+        - name: main-app
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: shared-data
+              mountPath: /shared-data
+
+        - name: sidecar
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting sidecar..."
+              cat /shared-data/config.yaml
+              echo "Config loaded, entering monitoring loop..."
+              while true; do
+                cat /shared-data/config.yaml > /dev/null
+                sleep 10
+              done
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
+          volumeMounts:
+            - name: shared-data
+              mountPath: /shared-data
