@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-03-16T08:45:32.699733+00:00",
+  "severity": "warning",
+  "type": "pod_not_ready",
+  "what": "Pod degrading-app-d95db578b-6qnst container web is Running but not Ready",
+  "where": {
+    "namespace": "lab3-orchestrator",
+    "pod": "degrading-app-d95db578b-6qnst",
+    "node": "unscheduled",
+    "container": "web"
+  },
+  "context": {
+    "ready": false,
+    "restart_count": 0
+  }
+}

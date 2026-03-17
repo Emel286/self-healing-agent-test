@@ -1,0 +1,17 @@
+{
+  "root_cause": "The pod 'degrading-app-d95db578b-2q7c6' entered a CrashLoopBackOff state due to being OOMKilled (Out of Memory Killed). The container's memory limit was set to 64Mi, which was insufficient for the workload, especially since the application was designed to consume memory until it reached the limit. This behavior was triggered by the custom script in the container that allocated memory continuously, leading to the OOMKilled state.",
+  "evidence": [
+    "Pod 'degrading-app-d95db578b-2q7c6' has a restart count of 9, indicating repeated failures.",
+    "The last state of the container was 'OOMKilled' with exit code 137, which indicates it was terminated due to exceeding memory limits.",
+    "Container spec shows memory limits set to 64Mi, which is likely insufficient given the application's design to consume memory continuously.",
+    "Kubernetes events indicate multiple 'Unhealthy' warnings due to failed readiness and liveness probes, which were likely a result of the container being unable to respond due to being OOMKilled.",
+    "The logs show that the application was designed to allocate memory continuously until it hit the OOM condition, as evidenced by the while loop that writes to /dev/shm."
+  ],
+  "remediation_steps": [
+    "Increase the memory limit for the 'degrading-app' container to a value that can accommodate its memory usage, such as 256Mi or higher, based on expected load.",
+    "Monitor the application after increasing the memory limit to ensure it stabilizes and does not enter CrashLoopBackOff again.",
+    "Consider refactoring the application to avoid excessive memory consumption or implement resource limits more effectively."
+  ],
+  "confidence": "high",
+  "risk_level": "medium"
+}
