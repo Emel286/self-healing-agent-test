@@ -1,53 +1,75 @@
-# infra-devai-hackathon
+# Self-Healing Kubernetes Agents — DevAI Hackathon
 
-A hands-on hackathon for teams who want to learn how to operate, troubleshoot, and automate Kubernetes workloads on Azure using AI-powered tools. Through three progressive labs, participants go from understanding AKS resiliency fundamentals, to diagnosing broken workloads with GitHub Copilot and Azure Copilot, to building a multi-agent SRE pipeline that detects, diagnoses, and remediates incidents automatically. This repo contains the Bicep infrastructure templates, deployment scripts, lab guides, and solution code needed to run the hackathon end-to-end.
+## About This Hackathon
 
-> **Disclaimer:** This hackathon is designed for **learning and experimentation purposes only**. The infrastructure, scripts, and configurations provided are not intended for production use. Security controls have been simplified to reduce friction during the labs. Before adapting any of this material for production workloads, review the [Cost & Security Considerations](considerations/) and consult your organization's cloud security and compliance teams.
+This is an **instructor-led hackathon** designed for teams who want to learn how to operate, troubleshoot, and automate Kubernetes workloads on Azure using AI-powered tools. A facilitator guides participants through three progressive labs — from Kubernetes resiliency fundamentals, to AI-assisted diagnosis with GitHub Copilot and Azure Copilot, to building a multi-agent SRE pipeline that detects, diagnoses, and remediates incidents automatically.
+
+**Infrastructure is pre-provisioned by the facilitator** before the hackathon begins. Each team receives their own isolated Azure environment (AKS cluster + Azure OpenAI instance) so they can focus entirely on the labs without worrying about setup. Attendees only need Azure CLI, `kubectl`, and a terminal to get started.
+
+> **Disclaimer:** This hackathon is designed for **learning and experimentation purposes only**. The infrastructure and configurations are not intended for production use — security controls have been simplified to reduce friction during the labs. See [Cost & Security Considerations](considerations/) for production hardening guidance.
 
 ## Hackathon Labs
 
-| Lab | Topic | Description |
-|-----|-------|-------------|
-| [Lab 1](labs/lab1-resiliency/) | **AKS Resiliency & Failure Basics** | Health probes, self-healing, node auto-repair, Pod Disruption Budgets |
-| [Lab 2](labs/lab2-devai-diagnosis/) | **Agent-Assisted Diagnosis (DevAI)** | AI-powered troubleshooting, YAML generation, context engineering |
-| [Lab 3](labs/lab3-sre-agent/) | **End-to-End SRE Agent Flow** | Multi-agent detect → diagnose → remediate pipeline, observability, automated remediation |
+| Lab | Topic | What You'll Do |
+|-----|-------|----------------|
+| [Lab 1](labs/lab1-resiliency/) | **AKS Resiliency & Failure Basics** | Configure health probes, observe self-healing, test Pod Disruption Budgets |
+| [Lab 2](labs/lab2-devai-diagnosis/) | **Agent-Assisted Diagnosis (DevAI)** | Deploy broken workloads, use AI to diagnose and fix them, practice context engineering |
+| [Lab 3](labs/lab3-sre-agent/) | **End-to-End SRE Agent Flow** | Build a multi-agent detect → diagnose → remediate pipeline in Python |
 
-> Complete the infrastructure deployment below before starting the labs.
+## Getting Started (Attendees)
 
-## Overview
+Your facilitator has already provisioned your team's environment. Connect to your cluster and start the labs:
 
-This project provisions the following Azure resources in the **West Europe (Netherlands)** region into **pre-existing resource groups** (one per team):
+```powershell
+# 1. Login to Azure
+az login
 
-| Resource | Description |
-|----------|-------------|
-| **Virtual Network** | Network isolation with a dedicated AKS subnet |
-| **User-Assigned Managed Identity** | Identity used by AKS to interact with Azure resources |
-| **AKS Cluster** | Managed Kubernetes cluster with a system node pool |
-| **Azure OpenAI** | GPT-4o-mini model for Lab 3 SRE diagnosis agent |
+# 2. Get your cluster credentials (replace <team> with your team name, e.g. apex)
+az aks get-credentials `
+  --resource-group rg-hackathon-self-healing-k8s-agent-<team> `
+  --name shk8s-<team>-aks
+
+# 3. Enable Azure CLI-based authentication
+kubelogin convert-kubeconfig -l azurecli
+
+# 4. Verify connectivity
+kubectl get nodes
+```
+
+Then start with **[Lab 1 — AKS Resiliency & Failure Basics](labs/lab1-resiliency/)** and work through the labs in order.
+
+> See the [Attendee Guide](ATTENDEE-GUIDE.md) for a full overview of topics, tech stack, and learning outcomes.
 
 ## Project Structure
 
 ```
 .
-├── main.bicep            # Main orchestration template (resource-group-level)
-├── main.bicepparam       # Parameter values for the deployment
-├── bicepconfig.json      # Bicep configuration file
-├── deploy-all.ps1        # Deploy to all teams (or a single team)
-├── delete-all.ps1        # Delete resources for all teams (or a single team)
-├── teams.json            # Team config (gitignored — sensitive)
-├── README.md             # This file
-├── considerations/       # Cost & security considerations
-│   └── README.md
-└── modules/
-    ├── network.bicep     # Virtual Network + AKS subnet
-    ├── identity.bicep    # User-assigned managed identity
-    ├── openai.bicep      # Azure OpenAI + model deployment
-    └── aks.bicep         # AKS cluster with system node pool
+├── labs/
+│   ├── lab1-resiliency/          # Lab 1 — Health probes, self-healing, PDBs
+│   │   └── solutions/manifests/  #   Solution YAMLs (healthy app, liveness, readiness, PDB)
+│   ├── lab2-devai-diagnosis/     # Lab 2 — AI-assisted troubleshooting
+│   │   └── solutions/manifests/  #   Broken + fixed YAMLs (CrashLoop, ImagePull, resource limits)
+│   └── lab3-sre-agent/           # Lab 3 — Multi-agent SRE pipeline
+│       └── solutions/
+│           ├── manifests/        #   Test workloads (degrading app)
+│           └── scripts/          #   Python agents (detection, diagnosis, remediation, orchestrator)
+├── ATTENDEE-GUIDE.md             # One-pager for participants
+├── considerations/               # Cost & security deep-dive
+│
+├── main.bicep                    # Infrastructure deployment (Bicep)
+├── modules/                      # Bicep modules (AKS, OpenAI, network, identity)
+├── deploy-all.ps1                # Deploy all teams
+├── delete-all.ps1                # Cleanup all teams
+└── teams.json                    # Team config (gitignored)
 ```
 
-## Prerequisites
+---
 
-Before deploying, ensure you have the following installed and configured:
+## Infrastructure Setup (Facilitators)
+
+Everything below is for **facilitators** provisioning team environments. Attendees can skip to [Getting Started](#getting-started-attendees).
+
+### Prerequisites
 
 1. **Azure CLI** (v2.60+)
    ```powershell
@@ -79,34 +101,27 @@ Before deploying, ensure you have the following installed and configured:
    az role assignment list --assignee "<your-email>" --output table
    ```
 
-## Parameters
+### Key Parameters
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `location` | `westeurope` | Azure region for all resources |
 | `namePrefix` | — | Prefix for all resource names (e.g., `shk8s-apex`) |
-| `vnetAddressPrefix` | `10.0.0.0/16` | VNet address space (CIDR) |
-| `aksSubnetAddressPrefix` | `10.0.0.0/22` | AKS subnet address prefix (CIDR) |
-| `aksSubnetName` | `snet-aks` | Name of the AKS subnet |
-| `enableDdosProtection` | `false` | Enable DDoS protection on VNet |
-| `networkPlugin` | `azure` | AKS network plugin (`azure` or `kubenet`) |
-| `networkPolicy` | `azure` | AKS network policy (`azure`, `calico`, or `none`) |
-| `serviceCidr` | `172.16.0.0/16` | Kubernetes internal service CIDR |
-| `dnsServiceIP` | `172.16.0.10` | DNS service IP (within serviceCidr) |
 | `kubernetesVersion` | `1.34` | Kubernetes version |
 | `systemNodeVmSize` | `Standard_D2s_v3` | VM size for system node pool |
 | `systemNodeCount` | `3` | Number of nodes in system node pool |
-| `tags` | `{}` | Tags applied to all resources |
 
-## Step-by-Step Deployment Guide
+See `main.bicepparam` for the full list of parameters (networking, CIDR ranges, tags, etc.).
 
-### Step 1 — Login to Azure
+### Deployment
+
+#### Step 1 — Login to Azure
 
 ```powershell
 az login
 ```
 
-### Step 2 — Select your subscription
+#### Step 2 — Select your subscription
 
 ```powershell
 # List available subscriptions
@@ -119,49 +134,33 @@ az account set --subscription "<subscription-id-or-name>"
 az account show --output table
 ```
 
-### Step 3 — Customize parameters (optional)
-
-Edit `main.bicepparam` to adjust resource names, region, networking, or AKS settings.
-
-### Step 4 — Validate the template (dry run)
+#### Step 3 — Deploy a single team
 
 ```powershell
-az deployment sub validate `
-  --location westeurope `
-  --template-file main.bicep `
-  --parameters main.bicepparam
-```
+$teamName = "apex"
+$rgName = "rg-hackathon-self-healing-k8s-agent-$teamName"
 
-### Step 5 — Preview changes (What-If)
-
-```powershell
-az deployment sub what-if `
-  --location westeurope `
-  --template-file main.bicep `
-  --parameters main.bicepparam
-```
-
-> **Note:** You may see a `NestedDeploymentShortCircuited` warning for the AKS module. This is expected — `what-if` cannot evaluate cross-module references until resources exist.
-
-### Step 6 — Deploy
-
-```powershell
-az deployment sub create `
-  --location westeurope `
+az deployment group create `
+  --resource-group $rgName `
   --template-file main.bicep `
   --parameters main.bicepparam `
-  --name devai-hackathon-deployment
+  --parameters namePrefix="shk8s-$teamName" `
+  --name "deploy-$teamName"
 ```
 
-> The `--location` flag specifies where the deployment metadata is stored, not where resources are created (that's controlled by the `location` parameter).
+Or deploy **all teams** at once using the helper script:
 
-### Step 7 — Assign AKS RBAC role
+```powershell
+.\deploy-all.ps1
+```
 
-Since the cluster uses Azure RBAC for Kubernetes authorization, assign yourself the cluster admin role:
+#### Step 4 — Assign AKS RBAC roles
+
+Each attendee needs the cluster admin role on their team's AKS cluster:
 
 ```powershell
 $userId = az ad signed-in-user show --query id -o tsv
-$aksId = az aks show --resource-group rg-devai-hackathon --name devai-hackathon-aks --query id -o tsv
+$aksId = az aks show --resource-group $rgName --name "shk8s-$teamName-aks" --query id -o tsv
 
 az role assignment create `
   --assignee $userId `
@@ -171,17 +170,7 @@ az role assignment create `
 
 > Role propagation may take 1–2 minutes.
 
-### Step 8 — Connect to the AKS cluster
-
-```powershell
-# Fetch credentials
-az aks get-credentials --resource-group rg-devai-hackathon --name devai-hackathon-aks
-
-# Convert kubeconfig to use Azure CLI authentication
-kubelogin convert-kubeconfig -l azurecli
-```
-
-## Post-Deployment Validation
+### Post-Deployment Validation
 
 ```powershell
 $teamName = "apex"
@@ -198,7 +187,7 @@ kubectl get nodes
 kubectl get pods -n kube-system
 ```
 
-## Cluster Management
+### Cluster Management
 
 ```powershell
 $teamName = "apex"
@@ -212,7 +201,7 @@ az aks stop --resource-group $rgName --name $aksName
 az aks start --resource-group $rgName --name $aksName
 ```
 
-## Cost & Security Considerations
+### Cost & Security Considerations
 
 > **This workshop is not production-ready.** The infrastructure is intentionally simplified for learning purposes.
 
@@ -221,7 +210,7 @@ az aks start --resource-group $rgName --name $aksName
 
 For detailed cost breakdowns, security baselines, and production hardening guidance, see the **[considerations/](considerations/)** folder.
 
-## Cleanup
+### Cleanup
 
 ```powershell
 # Delete resources for all teams
