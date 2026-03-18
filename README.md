@@ -1,8 +1,8 @@
 # infra-devai-hackathon
 
-Azure Kubernetes Service (AKS) infrastructure deployed using **Bicep** (Infrastructure as Code) on **Azure**. This repository serves as a **hackathon platform** with hands-on labs for learning AKS operations, resiliency, and best practices.
+A hands-on hackathon for teams who want to learn how to operate, troubleshoot, and automate Kubernetes workloads on Azure using AI-powered tools. Through three progressive labs, participants go from understanding AKS resiliency fundamentals, to diagnosing broken workloads with GitHub Copilot and Azure Copilot, to building a multi-agent SRE pipeline that detects, diagnoses, and remediates incidents automatically. This repo contains the Bicep infrastructure templates, deployment scripts, lab guides, and solution code needed to run the hackathon end-to-end.
 
-> **Disclaimer:** This workshop is designed for **learning and experimentation purposes only**. The infrastructure, scripts, and configurations provided are not intended for production use. Security controls have been simplified to reduce friction during the labs. Before adapting any of this material for production workloads, review the [Security Considerations](#security-considerations) section and consult your organization's cloud security and compliance teams.
+> **Disclaimer:** This hackathon is designed for **learning and experimentation purposes only**. The infrastructure, scripts, and configurations provided are not intended for production use. Security controls have been simplified to reduce friction during the labs. Before adapting any of this material for production workloads, review the [Cost & Security Considerations](considerations/) and consult your organization's cloud security and compliance teams.
 
 ## Hackathon Labs
 
