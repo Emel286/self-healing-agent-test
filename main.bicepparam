@@ -1,9 +1,10 @@
 using 'main.bicep'
 
 // ---------- General ----------
+// Change the team name suffix to match your assigned resource group
+// Teams: apex, bolt, core, edge, forge, gauge, index, koda, link, mira, nova
 param location = 'westeurope'
-param resourceGroupName = 'rg-devai-hackathon'
-param namePrefix = 'devai-hackathon'
+param namePrefix = 'shk8s-apex'
 
 // ---------- Networking ----------
 param vnetAddressPrefix = '10.0.0.0/16'

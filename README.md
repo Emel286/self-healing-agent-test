@@ -16,26 +16,32 @@ Azure Kubernetes Service (AKS) infrastructure deployed using **Bicep** (Infrastr
 
 ## Overview
 
-This project provisions the following Azure resources in the **West Europe (Netherlands)** region:
+This project provisions the following Azure resources in the **West Europe (Netherlands)** region into **pre-existing resource groups** (one per team):
 
 | Resource | Description |
 |----------|-------------|
-| **Resource Group** | Container for all deployed resources |
 | **Virtual Network** | Network isolation with a dedicated AKS subnet |
 | **User-Assigned Managed Identity** | Identity used by AKS to interact with Azure resources |
 | **AKS Cluster** | Managed Kubernetes cluster with a system node pool |
+| **Azure OpenAI** | GPT-4o-mini model for Lab 3 SRE diagnosis agent |
 
 ## Project Structure
 
 ```
 .
-├── main.bicep            # Main orchestration template (subscription-level)
+├── main.bicep            # Main orchestration template (resource-group-level)
 ├── main.bicepparam       # Parameter values for the deployment
 ├── bicepconfig.json      # Bicep configuration file
+├── deploy-all.ps1        # Deploy to all teams (or a single team)
+├── delete-all.ps1        # Delete resources for all teams (or a single team)
+├── teams.json            # Team config (gitignored — sensitive)
 ├── README.md             # This file
+├── considerations/       # Cost & security considerations
+│   └── README.md
 └── modules/
     ├── network.bicep     # Virtual Network + AKS subnet
     ├── identity.bicep    # User-assigned managed identity
+    ├── openai.bicep      # Azure OpenAI + model deployment
     └── aks.bicep         # AKS cluster with system node pool
 ```
 
@@ -78,8 +84,7 @@ Before deploying, ensure you have the following installed and configured:
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `location` | `westeurope` | Azure region for all resources |
-| `resourceGroupName` | — | Name of the resource group to create |
-| `namePrefix` | — | Prefix for all resource names |
+| `namePrefix` | — | Prefix for all resource names (e.g., `shk8s-apex`) |
 | `vnetAddressPrefix` | `10.0.0.0/16` | VNet address space (CIDR) |
 | `aksSubnetAddressPrefix` | `10.0.0.0/22` | AKS subnet address prefix (CIDR) |
 | `aksSubnetName` | `snet-aks` | Name of the AKS subnet |
@@ -178,109 +183,52 @@ kubelogin convert-kubeconfig -l azurecli
 
 ## Post-Deployment Validation
 
-Run the following commands to verify the deployment was successful:
-
 ```powershell
-# Verify the resource group exists
-az group show --name rg-devai-hackathon --output table
+$teamName = "apex"
+$rgName = "rg-hackathon-self-healing-k8s-agent-$teamName"
+$aksName = "shk8s-$teamName-aks"
 
-# Verify the AKS cluster is running
-az aks show --resource-group rg-devai-hackathon --name devai-hackathon-aks --query "powerState" -o tsv
+# Verify AKS cluster is running
+az aks show --resource-group $rgName --name $aksName --query "powerState" -o tsv
 
 # List cluster nodes
 kubectl get nodes
 
-# Check system pods are running
+# Check system pods
 kubectl get pods -n kube-system
-
-# Verify cluster info
-kubectl cluster-info
-
-# Check AKS networking (VNet)
-az network vnet show --resource-group rg-devai-hackathon --name devai-hackathon-vnet --output table
-
-# Check managed identity
-az identity show --resource-group rg-devai-hackathon --name devai-hackathon-aks-identity --output table
 ```
 
 ## Cluster Management
 
 ```powershell
-# Stop the cluster (saves costs when not in use)
-az aks stop --resource-group rg-devai-hackathon --name devai-hackathon-aks
+$teamName = "apex"
+$rgName = "rg-hackathon-self-healing-k8s-agent-$teamName"
+$aksName = "shk8s-$teamName-aks"
+
+# Stop the cluster (saves costs)
+az aks stop --resource-group $rgName --name $aksName
 
 # Start the cluster
-az aks start --resource-group rg-devai-hackathon --name devai-hackathon-aks
-
-# Check cluster power state
-az aks show --resource-group rg-devai-hackathon --name devai-hackathon-aks --query "powerState" -o tsv
+az aks start --resource-group $rgName --name $aksName
 ```
 
-## Cost Considerations
+## Cost & Security Considerations
 
-This workshop deploys billable Azure resources. The estimates below are provided for **awareness and planning purposes only** — actual costs depend on your Azure region, pricing tier, negotiated discounts, and usage patterns. **Always verify current pricing with your Azure administrator or the [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/) before deploying.**
+> **This workshop is not production-ready.** The infrastructure is intentionally simplified for learning purposes.
 
-| Resource | SKU | Estimated Cost | Notes |
-|----------|-----|---------------|-------|
-| **AKS Cluster** | 3x Standard_D2s_v3 (2 vCPU, 8 GiB) | ~$0.30/hr ($7.20/day) | The cluster control plane is free; you only pay for VMs |
-| **Azure OpenAI** | S0 + gpt-4o-mini (GlobalStandard) | ~$0.01–0.05/lab run | Pay-per-token; Lab 3 uses ~2K-5K tokens per diagnosis call |
-| **Virtual Network** | Standard | Free | No charge for VNet or subnets |
-| **Managed Identity** | — | Free | No charge for user-assigned identities |
-| **Public IP** (AKS load balancer) | Standard | ~$0.005/hr | Created automatically by AKS |
+- **Cost**: Each team's AKS cluster costs ~$0.30/hr (~$7.20/day). Stop clusters when not in use. Azure OpenAI costs ~$0.01–0.05 per lab run.
+- **Security**: Entra ID authentication is enabled by default (no API keys). The API server is publicly accessible — use private clusters for production.
 
-> **Important:** These are approximate figures based on pay-as-you-go pricing at the time of writing. Consult your organization's cloud team or Azure account representative for accurate cost projections specific to your environment.
-
-### Cost optimization tips
-
-- **Stop the cluster** when not in use — this deallocates the VMs and stops compute charges:
-  ```powershell
-  az aks stop --resource-group rg-devai-hackathon --name devai-hackathon-aks
-  ```
-- **Delete the resource group** when done with all labs to remove everything:
-  ```powershell
-  az group delete --name rg-devai-hackathon --yes --no-wait
-  ```
-- The AKS node pool has autoscaling (1–5 nodes) — idle clusters scale down to 1 node
-- Prometheus retention is set to 2h to minimize storage on the small VMs
-- Azure OpenAI uses `gpt-4o-mini` (lowest cost model) with 1K TPM capacity
-
-## Security Considerations
-
-> **This workshop is not production-ready.** The infrastructure and configurations are intentionally simplified to reduce setup friction and focus on learning objectives. Do not deploy this configuration as-is in production environments. The tables below describe what security measures are in place and what should be hardened before any production use.
-
-This infrastructure is designed for **workshop/hackathon use** and uses security defaults appropriate for a learning environment.
-
-### What's secure by default
-
-| Area | Implementation | Details |
-|------|---------------|--------|
-| **Authentication** | Microsoft Entra ID | AKS uses Azure RBAC for Kubernetes authorization — no static kubeconfig tokens |
-| **OpenAI auth** | Entra ID (token-based) | `disableLocalAuth=true` — API keys are disabled, authentication uses `AzureCliCredential` |
-| **Identity** | User-assigned managed identity | AKS control plane uses a managed identity instead of a service principal |
-| **Network plugin** | Azure CNI | Pods get VNet IPs, enabling NSG rules and Azure network policies |
-| **Network policy** | Azure | Pod-to-pod traffic can be restricted with Kubernetes NetworkPolicy resources |
-| **RBAC** | Azure RBAC | Cluster access is role-based — "Azure Kubernetes Service RBAC Cluster Admin" role required |
-
-### Workshop simplifications (review for production)
-
-| Area | Workshop Setting | Production Recommendation |
-|------|-----------------|---------------------------|
-| **API server** | Public endpoint | Enable [private cluster](https://learn.microsoft.com/azure/aks/private-clusters) or authorized IP ranges |
-| **Grafana password** | `admin` (hardcoded in Helm) | Use Azure Managed Grafana or a Kubernetes Secret with a strong password |
-| **DDoS protection** | Disabled | Enable Azure DDoS Protection for internet-facing workloads |
-| **Container registry** | Public images (nginx) | Use Azure Container Registry with private endpoint and image scanning |
-| **Secrets management** | Environment variables | Use Azure Key Vault with the [AKS Secrets Store CSI driver](https://learn.microsoft.com/azure/aks/csi-secrets-store-driver) |
-| **Logging** | Prometheus only (local) | Enable [Azure Monitor Container Insights](https://learn.microsoft.com/azure/azure-monitor/containers/container-insights-overview) for centralized logging |
-| **Node OS** | Default (Ubuntu/AzureLinux) | Enable automatic node OS upgrades and [Defender for Containers](https://learn.microsoft.com/azure/defender-for-cloud/defender-for-containers-introduction) |
-
-> **Next step:** If you plan to move any of these patterns to production, work with your organization's security and platform teams to apply your company's security baselines. The [Azure Well-Architected Framework — Security pillar](https://learn.microsoft.com/azure/well-architected/security/) provides comprehensive guidance.
+For detailed cost breakdowns, security baselines, and production hardening guidance, see the **[considerations/](considerations/)** folder.
 
 ## Cleanup
 
-To delete all deployed resources:
-
 ```powershell
-az group delete --name rg-devai-hackathon --yes --no-wait
+# Delete resources for all teams
+.\delete-all.ps1
+
+# Delete resources for a single team
+.\delete-all.ps1 -Team apex
 ```
 
-> Since all resources reside in a single resource group, deleting it removes everything.
+> This deletes the deployed resources (AKS, VNet, identity, OpenAI) inside each team's resource group, not the resource groups themselves.

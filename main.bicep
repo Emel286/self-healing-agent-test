@@ -1,18 +1,13 @@
 // ============================================================================
-// Main Bicep template - Subscription-level deployment
-// Deploys: Resource Group, Virtual Network, Managed Identity, and AKS Cluster
+// Main Bicep template - Resource Group-level deployment
+// Deploys: Virtual Network, Managed Identity, Azure OpenAI, and AKS Cluster
 // Region: West Europe (The Netherlands)
 // ============================================================================
-
-targetScope = 'subscription'
 
 // ---------- General Parameters ----------
 
 @description('Azure region for all resources (default: West Europe / The Netherlands)')
 param location string = 'westeurope'
-
-@description('Name of the resource group to create')
-param resourceGroupName string
 
 @description('Name prefix used to generate unique resource names across modules')
 param namePrefix string
@@ -75,22 +70,12 @@ param systemNodeVmSize string = 'Standard_D2s_v3'
 @maxValue(50)
 param systemNodeCount int = 3
 
-// ---------- Resource Group ----------
-// Creates the resource group that will contain all deployed resources.
-
-resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
-  name: resourceGroupName
-  location: location
-  tags: tags
-}
-
 // ---------- Module: Networking ----------
 // Deploys a Virtual Network with a dedicated AKS subnet.
 // The VNet provides network isolation and the subnet is used by AKS node pools.
 
 module network 'modules/network.bicep' = {
   name: 'network-deployment'
-  scope: rg
   params: {
     location: location
     namePrefix: namePrefix
@@ -108,7 +93,6 @@ module network 'modules/network.bicep' = {
 
 module identity 'modules/identity.bicep' = {
   name: 'identity-deployment'
-  scope: rg
   params: {
     location: location
     namePrefix: namePrefix
@@ -122,7 +106,6 @@ module identity 'modules/identity.bicep' = {
 
 module openai 'modules/openai.bicep' = {
   name: 'openai-deployment'
-  scope: rg
   params: {
     location: openaiLocation
     namePrefix: namePrefix
@@ -139,7 +122,6 @@ module openai 'modules/openai.bicep' = {
 
 module aks 'modules/aks.bicep' = {
   name: 'aks-deployment'
-  scope: rg
   params: {
     location: location
     clusterName: '${namePrefix}-aks'
@@ -171,9 +153,6 @@ output vnetName string = network.outputs.vnetName
 
 @description('Client ID of the managed identity assigned to AKS')
 output identityClientId string = identity.outputs.clientId
-
-@description('Name of the created resource group')
-output resourceGroupName string = rg.name
 
 @description('Azure OpenAI endpoint URL')
 output openaiEndpoint string = openai.outputs.endpoint
