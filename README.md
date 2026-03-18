@@ -156,7 +156,12 @@ Or deploy **all teams** at once using the helper script:
 
 #### Step 4 — Assign AKS RBAC roles
 
-Each attendee needs the cluster admin role on their team's AKS cluster:
+The AKS cluster uses **Azure RBAC for Kubernetes authorization** (`enableAzureRBAC: true`). This means having Owner or Contributor on the resource group is **not enough** to run `kubectl` commands — users also need an AKS-specific data plane role such as `Azure Kubernetes Service RBAC Cluster Admin`.
+
+There are two ways to handle this:
+
+1. **Customer assigns the role to the team group at the RG level** — If the group that is assigned to each team's resource group also gets `Azure Kubernetes Service RBAC Cluster Admin` on that RG, the role inherits down to the AKS cluster automatically. No facilitator action needed.
+2. **Facilitator assigns the role per-team after deployment** — If the customer only assigns control plane roles (Owner/Contributor), the facilitator must explicitly grant data plane access:
 
 ```powershell
 $userId = az ad signed-in-user show --query id -o tsv
