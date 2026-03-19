@@ -45,7 +45,7 @@ $subscription = $config.subscription
 $rgPrefix = $config.rgPrefix
 $namePrefix = $config.namePrefix
 
-$teams = if ($Team) { @($Team) } else { $config.teams }
+$teams = if ($Team) { @($Team) } else { $config.teams | ForEach-Object { $_.name } }
 
 Write-Host "`n=== Hackathon Deployment ===" -ForegroundColor Cyan
 Write-Host "Subscription: $subscription"
