@@ -23,16 +23,30 @@ Your facilitator has already provisioned your team's environment. Connect to you
 ```powershell
 # 1. Login to Azure
 az login
+```
 
-# 2. Get your cluster credentials (replace <team> with your team name, e.g. apex)
+> When prompted, select the **AHNL S00 Playground** subscription. If you have access to multiple subscriptions, you can set it explicitly:
+> ```powershell
+> az account set --subscription "AHNL S00 Playground"
+> ```
+
+```powershell
+# 2. Install kubectl and kubelogin
+az aks install-cli
+```
+
+> **Important:** Use `az aks install-cli` to install `kubelogin` — do **not** install it from Homebrew's main tap (`brew install kubelogin`), as that installs a different package that won't work with AKS.
+
+```powershell
+# 3. Get your cluster credentials (replace <team> with your team name, e.g. apex)
 az aks get-credentials `
   --resource-group rg-hackathon-self-healing-k8s-agent-<team> `
   --name shk8s-<team>-aks
 
-# 3. Enable Azure CLI-based authentication
+# 4. Enable Azure CLI-based authentication
 kubelogin convert-kubeconfig -l azurecli
 
-# 4. Verify connectivity
+# 5. Verify connectivity
 kubectl get nodes
 ```
 
