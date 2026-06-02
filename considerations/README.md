@@ -25,7 +25,7 @@ This workshop deploys billable Azure resources. The estimates below are provided
 - **Stop clusters when not in use** — this deallocates the VMs and stops compute charges:
   ```powershell
   $teamName = "apex"
-  az aks stop --resource-group "rg-hackathon-self-healing-k8s-agent-$teamName" --name "shk8s-$teamName-aks"
+  az aks stop --resource-group "rg-hackathon-selfhealingk8sagent$teamName" --name "shk8s-$teamName-aks"
   ```
 - **Delete resources when done** with all labs:
   ```powershell

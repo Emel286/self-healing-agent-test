@@ -40,7 +40,7 @@ az aks install-cli
 ```powershell
 # 3. Get your cluster credentials (replace <team> with your team name, e.g. apex)
 az aks get-credentials `
-  --resource-group rg-hackathon-self-healing-k8s-agent-<team> `
+   --resource-group rg-hackathon-selfhealingk8sagent<team> `
   --name shk8s-<team>-aks
 
 # 4. Enable Azure CLI-based authentication
@@ -152,7 +152,7 @@ az account show --output table
 
 ```powershell
 $teamName = "apex"
-$rgName = "rg-hackathon-self-healing-k8s-agent-$teamName"
+$rgName = "rg-hackathon-selfhealingk8sagent$teamName"
 
 az deployment group create `
   --resource-group $rgName `
@@ -176,7 +176,7 @@ Each team has an **AD group** with Owner on their RG. The facilitator assigns th
 
 ```powershell
 $teamName = "apex"
-$rgName = "rg-hackathon-self-healing-k8s-agent-$teamName"
+$rgName = "rg-hackathon-selfhealingk8sagent$teamName"
 $aksId = az aks show --resource-group $rgName --name "shk8s-$teamName-aks" --query id -o tsv
 
 # Replace <group-object-id> with the team's AD group Object ID
@@ -192,7 +192,7 @@ az role assignment create `
 
 ```powershell
 $teamName = "apex"
-$rgName = "rg-hackathon-self-healing-k8s-agent-$teamName"
+$rgName = "rg-hackathon-selfhealingk8sagent$teamName"
 $aksName = "shk8s-$teamName-aks"
 
 # Verify AKS cluster is running
@@ -209,7 +209,7 @@ kubectl get pods -n kube-system
 
 ```powershell
 $teamName = "apex"
-$rgName = "rg-hackathon-self-healing-k8s-agent-$teamName"
+$rgName = "rg-hackathon-selfhealingk8sagent$teamName"
 $aksName = "shk8s-$teamName-aks"
 
 # Stop the cluster (saves costs)
