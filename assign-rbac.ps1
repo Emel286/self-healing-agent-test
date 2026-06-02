@@ -62,8 +62,16 @@ $failed = 0
 foreach ($t in $teams) {
     $teamName = $t.name
     $groupId = $t.groupId
-    $rgName = "$rgPrefix-$teamName"
-    $aksName = "$namePrefix-$teamName-aks"
+    $rgName = if ($t.PSObject.Properties.Name -contains 'rgName' -and -not [string]::IsNullOrWhiteSpace($t.rgName)) {
+        $t.rgName
+    } else {
+        "$rgPrefix$teamName"
+    }
+    $aksName = if ($t.PSObject.Properties.Name -contains 'aksName' -and -not [string]::IsNullOrWhiteSpace($t.aksName)) {
+        $t.aksName
+    } else {
+        "$namePrefix-$teamName-aks"
+    }
 
     Write-Host "  $teamName : " -NoNewline
 

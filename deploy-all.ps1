@@ -45,24 +45,38 @@ $subscription = $config.subscription
 $rgPrefix = $config.rgPrefix
 $namePrefix = $config.namePrefix
 
-$teams = if ($Team) { @($Team) } else { $config.teams | ForEach-Object { $_.name } }
+$teams = if ($Team) {
+    $config.teams | Where-Object { $_.name -eq $Team }
+} else {
+    $config.teams
+}
+
+if (-not $teams) {
+    Write-Error "Team '$Team' not found in $TeamsFile"
+    return
+}
 
 Write-Host "`n=== Hackathon Deployment ===" -ForegroundColor Cyan
 Write-Host "Subscription: $subscription"
-Write-Host "Teams: $($teams -join ', ')"
+Write-Host "Teams: $(($teams | ForEach-Object { $_.name }) -join ', ')"
 Write-Host "Template: $TemplateFile"
 Write-Host ""
 
 $jobs = @()
 
 foreach ($t in $teams) {
-    $rgName = "$rgPrefix-$t"
-    $prefix = "$namePrefix-$t"
-    $deployName = "$t-deployment"
+    $teamName = $t.name
+    $rgName = if ($t.PSObject.Properties.Name -contains 'rgName' -and -not [string]::IsNullOrWhiteSpace($t.rgName)) {
+        $t.rgName
+    } else {
+        "$rgPrefix$teamName"
+    }
+    $prefix = "$namePrefix-$teamName"
+    $deployName = "$teamName-deployment"
 
-    Write-Host "Starting deployment for team '$t' -> $rgName" -ForegroundColor Yellow
+    Write-Host "Starting deployment for team '$teamName' -> $rgName" -ForegroundColor Yellow
 
-    $jobs += Start-Job -Name $t -ScriptBlock {
+    $jobs += Start-Job -Name $teamName -ScriptBlock {
         param($rg, $template, $params, $prefix, $sub, $deployName)
         az deployment group create `
             --resource-group $rg `

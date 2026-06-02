@@ -42,13 +42,21 @@ if (-not (Test-Path $TeamsFile)) {
 $config = Get-Content $TeamsFile | ConvertFrom-Json
 $subscription = $config.subscription
 $rgPrefix = $config.rgPrefix
-$namePrefix = $config.namePrefix
 
-$teams = if ($Team) { @($Team) } else { $config.teams | ForEach-Object { $_.name } }
+$teams = if ($Team) {
+    $config.teams | Where-Object { $_.name -eq $Team }
+} else {
+    $config.teams
+}
+
+if (-not $teams) {
+    Write-Error "Team '$Team' not found in $TeamsFile"
+    return
+}
 
 Write-Host "`n=== Hackathon Resource Cleanup ===" -ForegroundColor Red
 Write-Host "Subscription: $subscription"
-Write-Host "Teams: $($teams -join ', ')"
+Write-Host "Teams: $(($teams | ForEach-Object { $_.name }) -join ', ')"
 Write-Host ""
 
 if (-not $Force) {
@@ -62,13 +70,17 @@ if (-not $Force) {
 $jobs = @()
 
 foreach ($t in $teams) {
-    $rgName = "$rgPrefix-$t"
-    $prefix = "$namePrefix-$t"
+    $teamName = $t.name
+    $rgName = if ($t.PSObject.Properties.Name -contains 'rgName' -and -not [string]::IsNullOrWhiteSpace($t.rgName)) {
+        $t.rgName
+    } else {
+        "$rgPrefix$teamName"
+    }
 
-    Write-Host "Starting cleanup for team '$t' -> $rgName" -ForegroundColor Yellow
+    Write-Host "Starting cleanup for team '$teamName' -> $rgName" -ForegroundColor Yellow
 
-    $jobs += Start-Job -Name $t -ScriptBlock {
-        param($rg, $prefix, $sub)
+    $jobs += Start-Job -Name $teamName -ScriptBlock {
+        param($rg, $sub)
 
         $resources = az resource list --resource-group $rg --subscription $sub --query "[].id" -o tsv 2>&1
         if ($LASTEXITCODE -ne 0 -or -not $resources) {
@@ -83,7 +95,7 @@ foreach ($t in $teams) {
         }
 
         return "Cleaned $rg"
-    } -ArgumentList $rgName, $prefix, $subscription
+    } -ArgumentList $rgName, $subscription
 }
 
 Write-Host "`nWaiting for all cleanups to complete..." -ForegroundColor Cyan
